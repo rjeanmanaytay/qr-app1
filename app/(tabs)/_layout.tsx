@@ -1,15 +1,11 @@
 import { Tabs } from 'expo-router';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#ffd33d',
-        headerStyle: { backgroundColor: '#25292e' },
-        headerShadowVisible: false,
-        headerTintColor: '#fff',
-        tabBarStyle: { backgroundColor: '#25292e' },
+        headerShown: true,
       }}
     >
       <Tabs.Screen
@@ -18,7 +14,7 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? 'home-sharp' : 'home-outline'}
+              name={focused ? 'home' : 'home-outline'}
               color={color}
               size={24}
             />
@@ -31,7 +27,7 @@ export default function TabLayout() {
           title: 'Scan',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? 'qr-code' : 'qr-code-outline'}
+              name={focused ? 'camera' : 'camera-outline'}
               color={color}
               size={24}
             />
@@ -44,7 +40,7 @@ export default function TabLayout() {
           title: 'History',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
-              name={focused ? 'time' : 'time-outline'}
+              name={focused ? 'list' : 'list-outline'}
               color={color}
               size={24}
             />
@@ -58,6 +54,19 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'person' : 'person-outline'}
+              color={color}
+              size={24}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="teacher"
+        options={{
+          title: 'Teacher',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons
+              name={focused ? 'clipboard' : 'clipboard-outline'}
               color={color}
               size={24}
             />

@@ -1,5 +1,5 @@
 export const COLORS = {
-  primary: '#c0157e',
+  primary: '#d38db0',
   background: '#F5F9FF',
   card: '#FFFFFF',
   textPrimary: '#0D1B2A',
@@ -7,5 +7,5 @@ export const COLORS = {
   textOnPrimary: '#FFFFFF',
   surface: '#E3F2FD',
   border: '#E0E8F0',
-  shadow: '#0D47A1',
+  shadow: '#0c80ce',
 } as const;
