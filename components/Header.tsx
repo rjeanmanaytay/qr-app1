@@ -1,5 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/constants/colors';
 
@@ -8,9 +7,12 @@ type Props = { title: string };
 export default function Header({ title }: Props) {
   return (
     <View style={styles.container}>
-      <View style={styles.logoCircle}>
-        <MaterialIcons name="qr-code-2" size={36} color={COLORS.primary} />
-      </View>
+      <Image
+        source={require('../assets/images/qr-logo.png')}
+        style={styles.logo}
+        resizeMode="contain"
+      />
+
       <Text style={styles.title}>{title}</Text>
     </View>
   );
@@ -21,13 +23,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 24,
   },
-  logoCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: COLORS.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logo: {
+    width: 70,
+    height: 70,
     marginBottom: 12,
   },
   title: {
@@ -36,4 +34,3 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
   },
 });
-

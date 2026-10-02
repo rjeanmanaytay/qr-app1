@@ -2,8 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
-import { useCallback, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import { useCallback, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -17,69 +17,30 @@ import QRCode from 'react-native-qrcode-svg';
 
 import AppButton from '@/components/AppButton';
 import { COLORS } from '@/constants/colors';
+import { useAuth } from '@/lib/auth';
 import { createEvent } from '@/lib/events';
+import { getProfile, Role } from '@/lib/profiles';
 import { buildQRPayload } from '@/lib/qr';
-import {
-  getCurrentUserRole,
-  type Role,
-} from '@/lib/profile';
 
-/* =========================================================
-   HELPERS
-   ========================================================= */
+function toLocalISO(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
 
-function toLocalISO(date: Date): string {
-  const pad = (n: number) =>
-    String(n).padStart(2, '0');
-
-  return `${date.getFullYear()}-${pad(
-    date.getMonth() + 1
-  )}-${pad(date.getDate())}T${pad(
-    date.getHours()
-  )}:${pad(date.getMinutes())}:00`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
+    date.getDate()
+  )}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
 }
 
-function formatDateTime(date: Date): string {
-  const pad = (n: number) =>
-    String(n).padStart(2, '0');
+function formatDateTime(date: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
 
   const month = date.toLocaleString('en-US', {
     month: 'short',
   });
 
-  return `${month} ${pad(
-    date.getDate()
-  )}, ${date.getFullYear()} at ${pad(
+  return `${month} ${pad(date.getDate())}, ${date.getFullYear()} at ${pad(
     date.getHours()
   )}:${pad(date.getMinutes())}`;
 }
-
-/*
- * Generates a UUID v4.
- *
- * This is used internally as the Supabase event ID.
- * The teacher does NOT need to type a UUID.
- */
-function generateUUID(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(
-    /[xy]/g,
-    (character) => {
-      const random =
-        (Math.random() * 16) | 0;
-
-      const value =
-        character === 'x'
-          ? random
-          : (random & 0x3) | 0x8;
-
-      return value.toString(16);
-    }
-  );
-}
-
-/* =========================================================
-   QUICK END OPTIONS
-   ========================================================= */
 
 const QUICK_END_OPTIONS = [
   {
@@ -96,86 +57,45 @@ const QUICK_END_OPTIONS = [
   },
 ];
 
-/* =========================================================
-   TYPES
-   ========================================================= */
-
 type EditTarget = 'start' | 'end';
 
-interface PickerFieldProps {
-  value: string;
-  icon: string;
-  onPress: () => void;
-}
-
-/* =========================================================
-   PICKER FIELD
-   ========================================================= */
-
-function PickerField({
-  value,
-  icon,
-  onPress,
-}: PickerFieldProps) {
-  return (
-    <Pressable
-      style={styles.pickerField}
-      onPress={onPress}
-    >
-      <Ionicons
-        name={icon as any}
-        size={20}
-        color={COLORS.primary}
-      />
-
-      <Text style={styles.pickerFieldText}>
-        {value}
-      </Text>
-    </Pressable>
-  );
-}
-
-/* =========================================================
-   TEACHER SCREEN
-   ========================================================= */
-
 export default function TeacherScreen() {
-  /* =======================================================
-     ROLE
-     ======================================================= */
+  const { user } = useAuth();
 
-  const [role, setRole] =
-    useState<Role | null>(null);
+  const [role, setRole] = useState<Role | null>(null);
+  const [roleLoading, setRoleLoading] = useState(true);
 
-  const [roleLoading, setRoleLoading] =
-    useState(true);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
 
-  /* =======================================================
-     EVENT INFORMATION
-     ======================================================= */
+      if (!user) {
+        setRoleLoading(false);
+        return () => {
+          active = false;
+        };
+      }
+
+      getProfile(user.id).then((profile) => {
+        if (!active) return;
+        setRole(profile?.role ?? 'student');
+        setRoleLoading(false);
+      });
+
+      return () => {
+        active = false;
+      };
+    }, [user])
+  );
 
   const [title, setTitle] = useState('');
-  const [eventCode, setEventCode] = useState('');
+  const [eventId, setEventId] = useState('');
 
-  /* =======================================================
-     DATE / TIME
-     ======================================================= */
+  const [startDate, setStartDate] = useState(() => new Date());
 
-  const [startDate, setStartDate] =
-    useState(() => new Date());
-
-  const [endDate, setEndDate] =
-    useState(
-      () =>
-        new Date(
-          Date.now() +
-            60 * 60 * 1000
-        )
-    );
-
-  /* =======================================================
-     DATE PICKER
-     ======================================================= */
+  const [endDate, setEndDate] = useState(
+    () => new Date(Date.now() + 60 * 60 * 1000)
+  );
 
   const [editTarget, setEditTarget] =
     useState<EditTarget | null>(null);
@@ -183,92 +103,34 @@ export default function TeacherScreen() {
   const [editingPart, setEditingPart] =
     useState<'date' | 'time'>('date');
 
-  /* =======================================================
-     QR / MESSAGE
-     ======================================================= */
-
   const [payload, setPayload] =
     useState<string | null>(null);
 
   const [message, setMessage] =
     useState<string | null>(null);
 
-  const [createdEventId, setCreatedEventId] =
-    useState<string | null>(null);
+  const isAndroid = Platform.OS === 'android';
 
-  const [isCreating, setIsCreating] =
-    useState(false);
-
-  const isAndroid =
-    Platform.OS === 'android';
-
-  /* =======================================================
-     CENTRALIZED ROLE CHECK
-     ======================================================= */
-
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-
-      const checkRole = async () => {
-        setRoleLoading(true);
-
-        const currentRole =
-          await getCurrentUserRole();
-
-        if (!active) {
-          return;
-        }
-
-        setRole(currentRole);
-        setRoleLoading(false);
-      };
-
-      checkRole();
-
-      return () => {
-        active = false;
-      };
-    }, [])
-  );
-
-  /* =======================================================
-     OPEN DATE/TIME PICKER
-     ======================================================= */
-
-  const openPicker = (
-    target: EditTarget
-  ) => {
+  const openPicker = (target: EditTarget) => {
     setMessage(null);
     setEditTarget(target);
     setEditingPart('date');
   };
 
-  /* =======================================================
-     DATE/TIME PICKER CHANGE
-     ======================================================= */
-
   const onPickerChange = (
     event: DateTimePickerEvent,
     selected?: Date
   ) => {
-    if (!editTarget) {
-      return;
-    }
+    if (!editTarget) return;
 
-    if (
-      event.type === 'dismissed' ||
-      !selected
-    ) {
+    if (event.type === 'dismissed' || !selected) {
       setEditTarget(null);
       setEditingPart('date');
       return;
     }
 
     const current =
-      editTarget === 'start'
-        ? startDate
-        : endDate;
+      editTarget === 'start' ? startDate : endDate;
 
     const next = new Date(current);
 
@@ -291,14 +153,7 @@ export default function TeacherScreen() {
       setEndDate(next);
     }
 
-    /*
-     * Android shows date and time separately.
-     */
-
-    if (
-      isAndroid &&
-      editingPart === 'date'
-    ) {
+    if (isAndroid && editingPart === 'date') {
       setEditingPart('time');
     } else {
       setEditTarget(null);
@@ -306,39 +161,23 @@ export default function TeacherScreen() {
     }
   };
 
-  /* =======================================================
-     QUICK END TIME
-     ======================================================= */
-
-  const handleQuickEnd = (
-    ms: number
-  ) => {
+  const handleQuickEnd = (ms: number) => {
     setMessage(null);
 
     setEndDate(
-      new Date(
-        startDate.getTime() + ms
-      )
+      new Date(startDate.getTime() + ms)
     );
   };
 
-  /* =======================================================
-     CREATE EVENT
-     ======================================================= */
+  const handleCreateEvent = () => {
+    const event = {
+      eventId: eventId.trim(),
+      title: title.trim(),
+      start: toLocalISO(startDate),
+      end: toLocalISO(endDate),
+    };
 
-  const handleCreateEvent = async () => {
-    setMessage(null);
-
-    const cleanEventCode =
-      eventCode.trim();
-
-    const cleanTitle =
-      title.trim();
-
-    if (
-      !cleanEventCode ||
-      !cleanTitle
-    ) {
+    if (!event.eventId || !event.title) {
       setMessage(
         'Event title and code are required.'
       );
@@ -346,8 +185,7 @@ export default function TeacherScreen() {
     }
 
     if (
-      endDate.getTime() <=
-      startDate.getTime()
+      endDate.getTime() <= startDate.getTime()
     ) {
       setMessage(
         'End time must be after start time.'
@@ -355,209 +193,71 @@ export default function TeacherScreen() {
       return;
     }
 
-    /*
-     * Generate the Supabase event ID.
-     */
-
-    const generatedEventId =
-      generateUUID();
-
-    const eventStart =
-      toLocalISO(startDate);
-
-    const eventEnd =
-      toLocalISO(endDate);
-
-    /*
-     * This matches the EventInput
-     * expected by lib/events.ts:
-     *
-     * {
-     *   eventId,
-     *   title,
-     *   start,
-     *   end
-     * }
-     *
-     * We intentionally do NOT put the
-     * teacher's short eventCode here.
-     *
-     * Your createEvent() uses event.eventCode
-     * when supplied; leaving it undefined makes
-     * event_code default to eventId. This keeps
-     * the QR's event value and database event_code
-     * consistent.
-     */
-
-    const event = {
-      eventId: generatedEventId,
-      title: cleanTitle,
-      start: eventStart,
-      end: eventEnd,
-    };
-
-    try {
-      setIsCreating(true);
-
-      /*
-       * SAVE EVENT TO SUPABASE FIRST.
-       *
-       * The QR is only generated after
-       * the database save succeeds.
-       */
-
-      const result =
-        await createEvent(event);
-
-      if (result.error) {
-        throw new Error(
-          result.error
+    createEvent(event).then(({ error }) => {
+      if (error) {
+        setMessage(
+          'Could not save the event. Please try again.'
         );
+        return;
       }
 
-      /*
-       * Use the shared QR builder.
-       *
-       * This produces the canonical v:1
-       * QR payload used by the scanner.
-       */
-
-      const qrPayload =
-        buildQRPayload(event);
-
-      setPayload(qrPayload);
-
-      setCreatedEventId(
-        generatedEventId
-      );
-
       setMessage(
-        'Event saved successfully! Scan the QR with the Scan tab.'
-      );
-    } catch (error: unknown) {
-      console.error(
-        'Failed to create event:',
-        error
+        'Event saved! Scan the QR with the Scan tab to test it.'
       );
 
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : 'Unable to create event.'
-      );
-
-      /*
-       * Remove any old QR after a
-       * failed creation.
-       */
-
-      setPayload(null);
-      setCreatedEventId(null);
-    } finally {
-      setIsCreating(false);
-    }
+      setPayload(buildQRPayload(event));
+    });
   };
-
-  /* =======================================================
-     CLEAR / CREATE NEW EVENT
-     ======================================================= */
-
-  const handleCreateNew = () => {
-    setTitle('');
-    setEventCode('');
-
-    const newStart =
-      new Date();
-
-    const newEnd =
-      new Date(
-        newStart.getTime() +
-          60 * 60 * 1000
-      );
-
-    setStartDate(newStart);
-    setEndDate(newEnd);
-
-    setPayload(null);
-    setCreatedEventId(null);
-    setMessage(null);
-  };
-
-  /* =======================================================
-     ROLE GUARDS
-     ======================================================= */
 
   if (roleLoading) {
     return (
-      <View style={styles.lockScreen}>
-        <Ionicons
-          name="shield-checkmark-outline"
-          size={56}
-          color={COLORS.primary}
-        />
-
-        <Text style={styles.lockTitle}>
-          Checking your account...
-        </Text>
-
-        <Text style={styles.lockMessage}>
-          Please wait while we verify
-          your account.
-        </Text>
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Text style={styles.title}>
+            Checking your account...
+          </Text>
+        </View>
       </View>
     );
   }
 
   if (role !== 'teacher') {
     return (
-      <View style={styles.lockScreen}>
-        <Ionicons
-          name="lock-closed-outline"
-          size={56}
-          color={COLORS.primary}
-        />
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <View style={styles.lockContainer}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={48}
+              color={COLORS.textSecondary}
+            />
 
-        <Text style={styles.lockTitle}>
-          Teachers Only
-        </Text>
+            <Text style={styles.title}>
+              Teachers Only
+            </Text>
 
-        <Text style={styles.lockMessage}>
-          Only teacher accounts can
-          create events.
-        </Text>
+            <Text style={styles.subtitle}>
+              Only teacher accounts can create events.
+            </Text>
+          </View>
+        </View>
       </View>
     );
   }
 
-  /* =======================================================
-     RENDER
-     ======================================================= */
-
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={
-        styles.content
-      }
+      contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
     >
-      {/* =================================================
-          HEADER
-          ================================================= */}
-
       <Text style={styles.title}>
         Create Event QR
       </Text>
 
       <Text style={styles.subtitle}>
-        Fill in the event details, then
-        scan the generated QR with the
-        Scan tab.
+        Fill in the event details, then scan the generated QR with the Scan tab.
       </Text>
-
-      {/* =================================================
-          EVENT TITLE
-          ================================================= */}
 
       <Text style={styles.label}>
         Event Title
@@ -568,14 +268,8 @@ export default function TeacherScreen() {
         value={title}
         onChangeText={setTitle}
         placeholder="e.g. Founders Day Assembly"
-        placeholderTextColor={
-          COLORS.textSecondary
-        }
+        placeholderTextColor={COLORS.textSecondary}
       />
-
-      {/* =================================================
-          EVENT CODE
-          ================================================= */}
 
       <Text style={styles.label}>
         Event Code
@@ -583,525 +277,298 @@ export default function TeacherScreen() {
 
       <TextInput
         style={styles.input}
-        value={eventCode}
-        onChangeText={setEventCode}
-        placeholder="e.g. FD2026"
-        placeholderTextColor={
-          COLORS.textSecondary
-        }
+        value={eventId}
+        onChangeText={setEventId}
+        placeholder="e.g. EVT-2026-0002"
+        placeholderTextColor={COLORS.textSecondary}
         autoCapitalize="characters"
       />
 
-      <Text style={styles.helperText}>
-        Enter a short code for your
-        reference. The database event ID
-        is generated automatically.
-      </Text>
-
-      {/* =================================================
-          START TIME
-          ================================================= */}
-
       <Text style={styles.label}>
-        Start
+        Starts
       </Text>
 
       <PickerField
-        value={formatDateTime(
-          startDate
-        )}
-        icon="calendar-outline"
-        onPress={() =>
-          openPicker('start')
-        }
+        value={formatDateTime(startDate)}
+        icon="sunny-outline"
+        onPress={() => openPicker('start')}
       />
 
-      {/* =================================================
-          END TIME
-          ================================================= */}
-
       <Text style={styles.label}>
-        End
+        Ends
       </Text>
 
       <PickerField
-        value={formatDateTime(
-          endDate
-        )}
-        icon="time-outline"
-        onPress={() =>
-          openPicker('end')
-        }
+        value={formatDateTime(endDate)}
+        icon="moon-outline"
+        onPress={() => openPicker('end')}
       />
 
-      {/* =================================================
-          QUICK END BUTTONS
-          ================================================= */}
-
-      <Text style={styles.quickLabel}>
-        Quick end time
-      </Text>
-
-      <View style={styles.quickRow}>
-        {QUICK_END_OPTIONS.map(
-          (option) => (
-            <Pressable
-              key={option.label}
-              style={
-                styles.quickButton
-              }
-              onPress={() =>
-                handleQuickEnd(
-                  option.ms
-                )
-              }
-            >
-              <Text
-                style={
-                  styles.quickButtonText
-                }
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          )
-        )}
-      </View>
-
-      {/* =================================================
-          DATE TIME PICKER
-          ================================================= */}
-
-      {editTarget && (
-        <DateTimePicker
-          value={
-            editTarget === 'start'
-              ? startDate
-              : endDate
-          }
-          mode={
-            isAndroid
-              ? editingPart === 'date'
-                ? 'date'
-                : 'time'
-              : 'datetime'
-          }
-          display={
-            isAndroid
-              ? 'default'
-              : 'spinner'
-          }
-          onChange={
-            onPickerChange
-          }
-        />
-      )}
-
-      {/* =================================================
-          CREATE BUTTON
-          ================================================= */}
-
-      <View
-        style={
-          styles.buttonContainer
-        }
-      >
-        <AppButton
-          title={
-            isCreating
-              ? 'Creating Event...'
-              : 'Create Event & QR'
-          }
-          onPress={
-            handleCreateEvent
-          }
-          disabled={isCreating}
-        />
-      </View>
-
-      {/* =================================================
-          MESSAGE
-          ================================================= */}
-
-      {message && (
-        <View
-          style={
-            styles.messageBox
-          }
-        >
-          <Text
-            style={
-              styles.messageText
+      <View style={styles.chipRow}>
+        {QUICK_END_OPTIONS.map((option) => (
+          <Pressable
+            key={option.label}
+            style={styles.chip}
+            onPress={() =>
+              handleQuickEnd(option.ms)
             }
           >
-            {message}
-          </Text>
+            <Text style={styles.chipText}>
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <Text style={styles.hint}>
+        Tap a chip to set the end time from start.
+      </Text>
+
+      {message && (
+        <Text style={styles.message}>
+          {message}
+        </Text>
+      )}
+
+      <AppButton
+        theme="primary"
+        title="Create Event"
+        icon="add-circle-outline"
+        onPress={handleCreateEvent}
+      />
+
+      {editTarget && (
+        <View style={styles.pickerContainer}>
+          <DateTimePicker
+            value={
+              editTarget === 'start'
+                ? startDate
+                : endDate
+            }
+            mode={
+              isAndroid
+                ? editingPart
+                : 'datetime'
+            }
+            display={
+              isAndroid
+                ? 'default'
+                : 'spinner'
+            }
+            onChange={onPickerChange}
+          />
         </View>
       )}
 
-      {/* =================================================
-          QR CODE
-          ================================================= */}
-
       {payload && (
-        <View
-          style={styles.qrSection}
-        >
-          <Text style={styles.qrTitle}>
-            Event QR Code
+        <View style={styles.resultCard}>
+          <Text style={styles.resultTitle}>
+            Scan this QR code with the Scan tab:
           </Text>
 
-          <Text
-            style={styles.qrSubtitle}
-          >
-            Show this QR code to students
-            so they can scan it.
-          </Text>
-
-          <View
-            style={
-              styles.qrContainer
-            }
-          >
+          <View style={styles.qrBox}>
             <QRCode
               value={payload}
-              size={240}
-              backgroundColor="white"
-              color="black"
+              size={200}
             />
           </View>
 
-          {/* -------------------------------------------
-              EVENT INFORMATION
-              ------------------------------------------- */}
-
-          <View
-            style={
-              styles.eventInfo
-            }
-          >
-            <Text
-              style={
-                styles.infoLabel
-              }
-            >
-              Event
-            </Text>
-
-            <Text
-              style={
-                styles.infoValue
-              }
-            >
-              {title.trim()}
-            </Text>
-
-            <Text
-              style={
-                styles.infoLabel
-              }
-            >
-              Event Code
-            </Text>
-
-            <Text
-              style={
-                styles.infoValue
-              }
-            >
-              {eventCode.trim()}
-            </Text>
-
-            <Text
-              style={
-                styles.infoLabel
-              }
-            >
-              Start
-            </Text>
-
-            <Text
-              style={
-                styles.infoValue
-              }
-            >
-              {formatDateTime(
-                startDate
-              )}
-            </Text>
-
-            <Text
-              style={
-                styles.infoLabel
-              }
-            >
-              End
-            </Text>
-
-            <Text
-              style={
-                styles.infoValue
-              }
-            >
-              {formatDateTime(
-                endDate
-              )}
-            </Text>
-
-            {createdEventId && (
-              <>
-                <Text
-                  style={
-                    styles.infoLabel
-                  }
-                >
-                  Database Event ID
-                </Text>
-
-                <Text
-                  style={
-                    styles.eventIdText
-                  }
-                >
-                  {createdEventId}
-                </Text>
-              </>
-            )}
-          </View>
-
-          {/* -------------------------------------------
-              CREATE ANOTHER EVENT
-              ------------------------------------------- */}
-
-          <View
-            style={
-              styles.buttonContainer
-            }
-          >
-            <AppButton
-              title="Create Another Event"
-              onPress={
-                handleCreateNew
-              }
-            />
-          </View>
+          <Text style={styles.payloadText}>
+            {payload}
+          </Text>
         </View>
       )}
     </ScrollView>
   );
 }
 
-/* =========================================================
-   STYLES
-   ========================================================= */
+type PickerFieldProps = {
+  value: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  onPress: () => void;
+};
+
+function PickerField({
+  value,
+  icon,
+  onPress,
+}: PickerFieldProps) {
+  return (
+    <Pressable
+      style={({ pressed }) => [
+        styles.pickerField,
+        pressed &&
+          styles.pickerFieldPressed,
+      ]}
+      onPress={onPress}
+    >
+      <Ionicons
+        name={icon}
+        size={20}
+        color={COLORS.primary}
+      />
+
+      <Text style={styles.pickerValue}>
+        {value}
+      </Text>
+
+      <Ionicons
+        name="calendar-outline"
+        size={18}
+        color={COLORS.textSecondary}
+      />
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
-  /* -------------------------------------------------------
-     ROLE LOCK SCREEN
-     ------------------------------------------------------- */
-
-  lockScreen: {
-    flex: 1,
-    backgroundColor:
-      COLORS.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-
-  lockTitle: {
-    marginTop: 16,
-    fontSize: 24,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-  },
-
-  lockMessage: {
-    marginTop: 8,
-    fontSize: 15,
-    lineHeight: 22,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-  },
-
-  /* -------------------------------------------------------
-     MAIN SCREEN
-     ------------------------------------------------------- */
-
   container: {
     flex: 1,
-    backgroundColor:
-      COLORS.background,
+    backgroundColor: COLORS.background,
   },
 
   content: {
-    padding: 20,
-    paddingBottom: 50,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 40,
+  },
+
+  lockContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
   },
 
   title: {
-    fontSize: 28,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '600',
     color: COLORS.textPrimary,
-    marginBottom: 8,
+    marginBottom: 4,
   },
 
   subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 14,
     color: COLORS.textSecondary,
-    marginBottom: 24,
+    lineHeight: 20,
+    marginBottom: 16,
   },
 
   label: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: COLORS.textPrimary,
-    marginBottom: 8,
-    marginTop: 12,
+    marginBottom: 6,
+    marginTop: 10,
   },
 
   input: {
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: 12,
-    backgroundColor:
-      COLORS.surface,
-    color: COLORS.textPrimary,
     paddingHorizontal: 14,
-    paddingVertical: 13,
-    fontSize: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: COLORS.textPrimary,
   },
 
-  helperText: {
+  pickerField: {
+    backgroundColor: COLORS.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+
+  pickerFieldPressed: {
+    backgroundColor: COLORS.surface,
+  },
+
+  pickerValue: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: COLORS.textPrimary,
+    marginHorizontal: 10,
+  },
+
+  chipRow: {
+    flexDirection: 'row',
+    marginTop: 8,
+  },
+
+  chip: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginRight: 8,
+  },
+
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.primary,
+  },
+
+  hint: {
     fontSize: 12,
-    lineHeight: 18,
     color: COLORS.textSecondary,
     marginTop: 6,
   },
 
-  pickerField: {
-    minHeight: 52,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    backgroundColor:
-      COLORS.surface,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
+  pickerContainer: {
+    marginTop: 12,
     alignItems: 'center',
   },
 
-  pickerFieldText: {
-    flex: 1,
-    marginLeft: 10,
-    fontSize: 15,
-    color: COLORS.textPrimary,
-  },
-
-  quickLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginTop: 18,
-    marginBottom: 8,
-  },
-
-  quickRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
-  },
-
-  quickButton: {
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-
-  quickButtonText: {
+  message: {
+    fontSize: 14,
     color: COLORS.primary,
-    fontWeight: '600',
-    fontSize: 13,
-  },
-
-  buttonContainer: {
-    marginTop: 24,
-  },
-
-  messageBox: {
-    marginTop: 16,
-    padding: 14,
-    borderRadius: 12,
-    backgroundColor:
-      COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-
-  messageText: {
-    color: COLORS.textPrimary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-
-  qrSection: {
-    marginTop: 30,
-    alignItems: 'center',
-  },
-
-  qrTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 6,
-  },
-
-  qrSubtitle: {
     textAlign: 'center',
-    fontSize: 14,
-    lineHeight: 20,
-    color: COLORS.textSecondary,
-    marginBottom: 20,
+    marginTop: 12,
   },
 
-  qrContainer: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  eventInfo: {
-    width: '100%',
-    marginTop: 24,
-    padding: 16,
+  resultCard: {
+    backgroundColor: COLORS.card,
     borderRadius: 14,
-    backgroundColor:
-      COLORS.surface,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    padding: 16,
+    marginTop: 20,
+    alignItems: 'center',
+
+    shadowColor: COLORS.shadow,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+
+    elevation: 3,
   },
 
-  infoLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-    marginTop: 10,
-    marginBottom: 3,
-  },
-
-  infoValue: {
+  resultTitle: {
     fontSize: 15,
+    fontWeight: '600',
     color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: 12,
   },
 
-  eventIdText: {
-    fontSize: 11,
+  qrBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+
+  payloadText: {
+    fontSize: 12,
     color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });

@@ -1,9 +1,14 @@
-import { router } from 'expo-router';
-import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { router } from "expo-router";
+import {
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
-import AppButton from '@/components/AppButton';
-import Header from '@/components/Header';
-import { COLORS } from '@/constants/colors';
+import AppButton from "@/components/AppButton";
+import Header from "@/components/Header";
+import { COLORS } from "@/constants/colors";
 
 export default function Index() {
   return (
@@ -13,10 +18,13 @@ export default function Index() {
       </View>
 
       <View style={styles.bodyContainer}>
-        <Text style={styles.mainTitle}>School Event Attendance</Text>
+        <Text style={styles.mainTitle}>
+          School Event Attendance
+        </Text>
 
         <Text style={styles.subtitle}>
-          Scan QR Codes to record attendance during school activities.
+          Scan QR Codes to record attendance during school
+          activities.
         </Text>
       </View>
 
@@ -25,19 +33,19 @@ export default function Index() {
           theme="primary"
           title="Scan QR Code"
           icon="qr-code-outline"
-          onPress={() => router.push('/scan')}
+          onPress={() => router.push("/scan")}
         />
 
         <AppButton
           title="Attendance History"
           icon="time-outline"
-          onPress={() => router.push('/history')}
+          onPress={() => router.push("/history")}
         />
 
         <AppButton
           title="Profile"
           icon="person-outline"
-          onPress={() => router.push('/profile')}
+          onPress={() => router.push("/profile")}
         />
       </View>
     </SafeAreaView>
@@ -52,32 +60,31 @@ const styles = StyleSheet.create({
 
   headerContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
 
   bodyContainer: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 32,
     marginBottom: 16,
   },
 
   mainTitle: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.textPrimary,
-    marginBottom: 8,
-    textAlign: 'left',
+    marginBottom: 6,
   },
 
   subtitle: {
     fontSize: 15,
-    lineHeight: 21,
     color: COLORS.textSecondary,
-    textAlign: 'left',
+    lineHeight: 21,
   },
 
   footerContainer: {
     flex: 1 / 3,
+    alignItems: "center",
     paddingHorizontal: 24,
-    width: '100%',
+    width: "100%",
   },
 });

@@ -1,11 +1,7 @@
 import { supabase } from "./supabase";
 import { parseQRPayload } from "./qr";
 import { getEventByCode } from "./events";
-import { getCurrentUserRole } from "./profile";
-
-/* =========================================================
-   TYPES
-   ========================================================= */
+import { getCurrentUserRole } from "./profiles";
 
 export type AttendanceRecord = {
   id: string;
@@ -44,10 +40,6 @@ export type TeacherEventSummary = {
   attendeeCount: number;
 };
 
-/* =========================================================
-   STUDENT — REGISTER ATTENDANCE
-   ========================================================= */
-
 export async function registerAttendance(
   rawPayload: string,
   studentId: string
@@ -76,8 +68,7 @@ export async function registerAttendance(
   if (studentId !== user.id) {
     return {
       success: false,
-      message:
-        "You can only register attendance for your own account.",
+      message: "You can only register attendance for your own account.",
     };
   }
 
@@ -143,10 +134,7 @@ export async function registerAttendance(
       .single();
 
     if (insertError || !newEvent) {
-      console.error(
-        "Error creating event:",
-        insertError
-      );
+      console.error("Error creating event:", insertError);
 
       return {
         success: false,
@@ -158,9 +146,7 @@ export async function registerAttendance(
     eventTitle = newEvent.title;
   }
 
-  const {
-    error: attendanceError,
-  } = await supabase
+  const { error: attendanceError } = await supabase
     .from("attendance")
     .insert([
       {
@@ -178,10 +164,7 @@ export async function registerAttendance(
       };
     }
 
-    console.error(
-      "Error recording attendance:",
-      attendanceError
-    );
+    console.error("Error recording attendance:", attendanceError);
 
     return {
       success: false,
@@ -196,10 +179,6 @@ export async function registerAttendance(
     eventTitle,
   };
 }
-
-/* =========================================================
-   STUDENT — ATTENDANCE HISTORY
-   ========================================================= */
 
 export async function getAttendanceHistory(
   studentId: string
@@ -264,23 +243,14 @@ export async function getAttendanceHistory(
   return data.map((record: any) => ({
     id: record.id,
     eventId: record.event_id,
-    eventTitle:
-      record.events?.title ?? "Unknown Event",
+    eventTitle: record.events?.title ?? "Unknown Event",
     scannedAt: record.scanned_at,
   }));
 }
 
-/* =========================================================
-   TEACHER — EVENT ATTENDANCE
-   ========================================================= */
-
 export async function getTeacherEventAttendance(
   teacherId: string
 ): Promise<TeacherEventAttendance[]> {
-  /* -------------------------------------------------------
-     1. Check logged-in user
-     ------------------------------------------------------- */
-
   const {
     data: { user },
     error: userError,
@@ -294,10 +264,6 @@ export async function getTeacherEventAttendance(
     return [];
   }
 
-  /* -------------------------------------------------------
-     2. Only teachers can view teacher attendance
-     ------------------------------------------------------- */
-
   const role = await getCurrentUserRole();
 
   if (role !== "teacher") {
@@ -308,10 +274,6 @@ export async function getTeacherEventAttendance(
     return [];
   }
 
-  /* -------------------------------------------------------
-     3. Teacher can only view their own events
-     ------------------------------------------------------- */
-
   if (teacherId !== user.id) {
     console.error(
       "A teacher can only view attendance for their own events."
@@ -319,10 +281,6 @@ export async function getTeacherEventAttendance(
 
     return [];
   }
-
-  /* -------------------------------------------------------
-     4. Get events created by this teacher
-     ------------------------------------------------------- */
 
   const {
     data: events,
@@ -346,17 +304,11 @@ export async function getTeacherEventAttendance(
     return [];
   }
 
-  const eventIds = events.map(
-    (event) => event.id
-  );
+  const eventIds = events.map((event) => event.id);
 
   if (eventIds.length === 0) {
     return [];
   }
-
-  /* -------------------------------------------------------
-     5. Get attendance records
-     ------------------------------------------------------- */
 
   const {
     data: attendance,
@@ -380,15 +332,9 @@ export async function getTeacherEventAttendance(
     return [];
   }
 
-  /* -------------------------------------------------------
-     6. Get student profiles
-     ------------------------------------------------------- */
-
   const studentIds = [
     ...new Set(
-      attendance.map(
-        (record) => record.student_id
-      )
+      attendance.map((record) => record.student_id)
     ),
   ];
 
@@ -424,14 +370,9 @@ export async function getTeacherEventAttendance(
     }
   }
 
-  /* -------------------------------------------------------
-     7. Group attendance by event
-     ------------------------------------------------------- */
-
   return events.map((event) => {
     const rows = attendance.filter(
-      (record) =>
-        record.event_id === event.id
+      (record) => record.event_id === event.id
     );
 
     return {
@@ -441,7 +382,6 @@ export async function getTeacherEventAttendance(
       startTime: event.start_time,
       endTime: event.end_time,
       attendeeCount: rows.length,
-
       attendees: rows.map((record) => {
         const profile =
           profilesById[record.student_id];
@@ -460,10 +400,6 @@ export async function getTeacherEventAttendance(
     };
   });
 }
-
-/* =========================================================
-   TEACHER — EVENT SUMMARY
-   ========================================================= */
 
 export async function getTeacherEventSummary(
   teacherId: string
@@ -504,9 +440,7 @@ export async function getTeacherEventSummary(
     error: eventError,
   } = await supabase
     .from("events")
-    .select(
-      "id, event_code, title"
-    )
+    .select("id, event_code, title")
     .eq("created_by", teacherId)
     .order("created_at", {
       ascending: false,
@@ -521,9 +455,7 @@ export async function getTeacherEventSummary(
     return [];
   }
 
-  const eventIds = events.map(
-    (event) => event.id
-  );
+  const eventIds = events.map((event) => event.id);
 
   if (eventIds.length === 0) {
     return [];
@@ -557,7 +489,6 @@ export async function getTeacherEventSummary(
     eventId: event.id,
     eventCode: event.event_code,
     title: event.title,
-    attendeeCount:
-      counts[event.id] ?? 0,
+    attendeeCount: counts[event.id] ?? 0,
   }));
 }

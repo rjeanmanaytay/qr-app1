@@ -1,9 +1,5 @@
-import { supabase } from './supabase';
-import { getCurrentUserRole } from './profile';
-
-/* =========================================================
-   TYPES
-   ========================================================= */
+import { supabase } from "./supabase";
+import { getCurrentUserRole } from "./profiles";
 
 export type EventInput = {
   eventId: string;
@@ -18,17 +14,9 @@ export type EventLookup = {
   title: string;
 };
 
-/* =========================================================
-   CREATE EVENT
-   ========================================================= */
-
 export async function createEvent(
   event: EventInput
 ): Promise<{ error: string | null }> {
-  /* -------------------------------------------------------
-     1. Get currently logged-in user
-     ------------------------------------------------------- */
-
   const {
     data: { user },
     error: userError,
@@ -42,84 +30,59 @@ export async function createEvent(
 
   if (!user) {
     return {
-      error: 'You must be logged in to create an event.',
+      error: "You must be logged in to create an event.",
     };
   }
-
-  /* -------------------------------------------------------
-     2. Check user role
-     ------------------------------------------------------- */
 
   const role = await getCurrentUserRole();
 
-  if (role !== 'teacher') {
+  if (role !== "teacher") {
     return {
-      error: 'Only teacher accounts can create events.',
+      error: "Only teacher accounts can create events.",
     };
   }
-
-  /* -------------------------------------------------------
-     3. Validate event title
-     ------------------------------------------------------- */
 
   const cleanTitle = event.title.trim();
 
   if (!cleanTitle) {
     return {
-      error: 'Event title is required.',
+      error: "Event title is required.",
     };
   }
 
-  /* -------------------------------------------------------
-     4. Validate event ID
-     ------------------------------------------------------- */
+  const cleanEventId = event.eventId.trim();
 
-  if (!event.eventId.trim()) {
+  if (!cleanEventId) {
     return {
-      error: 'Event ID is required.',
+      error: "Event ID is required.",
     };
   }
 
-  /* -------------------------------------------------------
-     5. Insert event into Supabase
-     ------------------------------------------------------- */
+  const cleanEventCode =
+    event.eventCode?.trim() || cleanEventId;
 
   const { error } = await supabase
-    .from('events')
+    .from("events")
     .insert({
-      id: event.eventId.trim(),
-      event_code:
-        event.eventCode?.trim() || event.eventId.trim(),
+      event_code: cleanEventCode,
       title: cleanTitle,
       start_time: event.start || null,
       end_time: event.end || null,
       created_by: user.id,
     });
 
-  /* -------------------------------------------------------
-     6. Return database error
-     ------------------------------------------------------- */
-
   if (error) {
-    console.error('Error creating event:', error);
+    console.error("Error creating event:", error);
 
     return {
       error: error.message,
     };
   }
 
-  /* -------------------------------------------------------
-     7. Success
-     ------------------------------------------------------- */
-
   return {
     error: null,
   };
 }
-
-/* =========================================================
-   GET EVENT BY CODE
-   ========================================================= */
 
 export async function getEventByCode(
   eventCode: string
@@ -130,21 +93,14 @@ export async function getEventByCode(
     return null;
   }
 
-  const {
-    data,
-    error,
-  } = await supabase
-    .from('events')
-    .select('id, title')
-    .eq('event_code', cleanEventCode)
+  const { data, error } = await supabase
+    .from("events")
+    .select("id, title")
+    .eq("event_code", cleanEventCode)
     .maybeSingle();
 
   if (error) {
-    console.error(
-      'Error finding event by code:',
-      error
-    );
-
+    console.error("Error finding event by code:", error);
     return null;
   }
 

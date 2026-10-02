@@ -1,13 +1,9 @@
-import { useEffect, useState } from 'react';
-import type { User } from '@supabase/supabase-js';
+import { useEffect, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 
-import { supabase } from './supabase';
+import { supabase } from "./supabase";
 
-/* =========================================================
-   TYPES
-   ========================================================= */
-
-export type UserRole = 'student' | 'teacher';
+export type UserRole = "student" | "teacher";
 
 export type SignUpProfile = {
   full_name: string;
@@ -16,13 +12,9 @@ export type SignUpProfile = {
 
 export type Profile = {
   id: string;
-  full_name: string;
+  full_name: string | null;
   role: UserRole;
 };
-
-/* =========================================================
-   SIGN IN
-   ========================================================= */
 
 export async function signIn(
   email: string,
@@ -34,10 +26,6 @@ export async function signIn(
   });
 }
 
-/* =========================================================
-   SIGN UP
-   ========================================================= */
-
 export async function signUp(
   email: string,
   password: string,
@@ -45,50 +33,27 @@ export async function signUp(
 ) {
   const cleanEmail = email.trim();
 
-  const { data, error } =
-    await supabase.auth.signUp({
-      email: cleanEmail,
-      password,
-    });
+  const { data, error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password,
+
+    // Send the Full Name and selected role
+    // to Supabase Auth metadata.
+    options: {
+      data: {
+        full_name: profile?.full_name?.trim() ?? "",
+        role: profile?.role ?? "student",
+      },
+    },
+  });
 
   if (error) {
-    console.error(
-      'Sign up failed:',
-      error
-    );
+    console.error("Sign up failed:", error);
 
     return {
       data,
       error,
     };
-  }
-
-  if (profile && data.user) {
-    const { error: profileError } =
-      await supabase
-        .from('profiles')
-        .upsert(
-          {
-            id: data.user.id,
-            full_name: profile.full_name.trim(),
-            role: profile.role,
-          },
-          {
-            onConflict: 'id',
-          }
-        );
-
-    if (profileError) {
-      console.error(
-        'Failed to save profile:',
-        profileError
-      );
-
-      return {
-        data,
-        error: profileError,
-      };
-    }
   }
 
   return {
@@ -97,27 +62,17 @@ export async function signUp(
   };
 }
 
-/* =========================================================
-   SIGN OUT
-   ========================================================= */
-
 export async function signOut() {
   return supabase.auth.signOut();
 }
 
-/* =========================================================
-   GET CURRENT USER
-   ========================================================= */
-
 export async function getCurrentUser(): Promise<User | null> {
-  const {
-    data,
-    error,
-  } = await supabase.auth.getUser();
+  const { data, error } =
+    await supabase.auth.getUser();
 
   if (error) {
     console.error(
-      'Failed to get current user:',
+      "Failed to get current user:",
       error
     );
 
@@ -127,22 +82,18 @@ export async function getCurrentUser(): Promise<User | null> {
   return data.user ?? null;
 }
 
-/* =========================================================
-   GET PROFILE
-   ========================================================= */
-
 export async function getProfile(
   userId: string
 ): Promise<Profile | null> {
   const { data, error } = await supabase
-    .from('profiles')
-    .select('id, full_name, role')
-    .eq('id', userId)
+    .from("profiles")
+    .select("id, full_name, role")
+    .eq("id", userId)
     .maybeSingle();
 
   if (error) {
     console.error(
-      'Failed to get profile:',
+      "Failed to get profile:",
       error
     );
 
@@ -152,25 +103,29 @@ export async function getProfile(
   return data as Profile | null;
 }
 
-/* =========================================================
-   AUTH HOOK
-   ========================================================= */
-
 export function useAuth() {
-  const [user, setUser] =
-    useState<User | null>(null);
-
-  const [loading, setLoading] =
-    useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        if (!mounted) {
+          return;
+        }
+
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
     const loadSession = async () => {
-      const {
-        data,
-        error,
-      } = await supabase.auth.getSession();
+      const { data, error } =
+        await supabase.auth.getSession();
 
       if (!mounted) {
         return;
@@ -178,40 +133,19 @@ export function useAuth() {
 
       if (error) {
         console.error(
-          'Failed to get session:',
+          "Failed to get session:",
           error
         );
 
         setUser(null);
       } else {
-        setUser(
-          data.session?.user ?? null
-        );
+        setUser(data.session?.user ?? null);
       }
 
       setLoading(false);
     };
 
     loadSession();
-
-    const {
-      data: {
-        subscription,
-      },
-    } =
-      supabase.auth.onAuthStateChange(
-        (_event, session) => {
-          if (!mounted) {
-            return;
-          }
-
-          setUser(
-            session?.user ?? null
-          );
-
-          setLoading(false);
-        }
-      );
 
     return () => {
       mounted = false;
@@ -224,4 +158,3 @@ export function useAuth() {
     loading,
   };
 }
-
